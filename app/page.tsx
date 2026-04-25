@@ -64,13 +64,18 @@ export default function HomePage() {
       setError('Please use your university email (e.g. .edu, .ac.uk)')
       return
     }
+    const digits = form.phone.replace(/\D/g, '')
+    if (digits.length !== 10) {
+      setError('Please enter a valid 10-digit US phone number')
+      return
+    }
     setLoading(true)
     try {
       const { data, error: dbError } = await supabase
         .from('users')
         .insert({
           name: form.name, email: form.email, gender: form.gender,
-          want_to_date: form.want_to_date, phone: form.phone,
+          want_to_date: form.want_to_date, phone: '+1' + form.phone.replace(/\D/g, ''),
           schedule_text: form.schedule_text || null, campus: form.campus,
           email_verified: false,
         })
@@ -207,11 +212,26 @@ export default function HomePage() {
                   </div>
                 </Field>
                 <Field label="phone" required hint="we'll text you when it's mutual 🍁">
-                  <input
-                    type="tel" placeholder="+1 (555) 000-0000" value={form.phone}
-                    onChange={(e) => set('phone', e.target.value)}
-                    className={inputCls}
-                  />
+                  <div className="flex items-center bg-white border border-[#e8e6e1] rounded-xl overflow-hidden focus-within:border-[#111] transition-colors">
+                    <div className="flex items-center gap-1.5 px-3 py-3 border-r border-[#e8e6e1] shrink-0 select-none">
+                      <span className="text-base leading-none">🇺🇸</span>
+                      <span className="text-sm text-[#6b6760] font-medium">+1</span>
+                    </div>
+                    <input
+                      type="tel"
+                      placeholder="(555) 000-0000"
+                      value={form.phone}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 10)
+                        let formatted = digits
+                        if (digits.length >= 7) formatted = `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`
+                        else if (digits.length >= 4) formatted = `(${digits.slice(0,3)}) ${digits.slice(3)}`
+                        else if (digits.length >= 1) formatted = `(${digits}`
+                        set('phone', formatted)
+                      }}
+                      className="flex-1 px-3 py-3 text-sm text-[#111] placeholder:text-[#c5c0bb] focus:outline-none bg-transparent"
+                    />
+                  </div>
                 </Field>
                 <div className="flex items-center gap-2 bg-[#f0ede8] rounded-xl px-4 py-3">
                   <span className="text-sm">✉️</span>
