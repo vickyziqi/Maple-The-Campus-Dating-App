@@ -203,6 +203,7 @@ export default function FeedPage() {
         setAllUsers(all ?? [])
 
         // Check for existing match on load (in case realtime event was missed)
+        const handledMatches: string[] = JSON.parse(localStorage.getItem('anlan_matches_handled') ?? '[]')
         const { data: existingMatch } = await supabase
           .from('matches')
           .select('id, status')
@@ -211,7 +212,7 @@ export default function FeedPage() {
           .order('created_at', { ascending: false })
           .limit(1)
           .single()
-        if (existingMatch) {
+        if (existingMatch && !handledMatches.includes(existingMatch.id)) {
           localStorage.setItem('anlan_match_id', existingMatch.id)
           router.push('/match')
           return

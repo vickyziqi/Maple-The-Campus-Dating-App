@@ -22,6 +22,15 @@ function avatarColor(id: string) {
 }
 
 
+const DEMO_STEPS = [
+  'Match detected',
+  'Fetching profiles',
+  'Reading calendars & parsing schedules',
+  'Finding best venue',
+  'Generating date plan',
+  'Sending confirmation',
+]
+
 type Screen = 'reveal' | 'loading' | 'datecard' | 'confirmed'
 
 export default function MatchPage() {
@@ -32,6 +41,7 @@ export default function MatchPage() {
   const [them, setThem] = useState<User | null>(null)
   const [dateCard, setDateCard] = useState<DateCard | null>(null)
   const [agentSteps, setAgentSteps] = useState<AgentStep[]>([])
+  const [simulatedStep, setSimulatedStep] = useState(0)
 
   useEffect(() => {
     const matchId = localStorage.getItem('anlan_match_id')
@@ -84,29 +94,20 @@ export default function MatchPage() {
     }
   }, [screen, dateCard])
 
-  // Demo fallback: if agent hasn't responded in 15s, use a hardcoded date card
+  // Animate through demo steps when on loading screen
   useEffect(() => {
     if (screen !== 'loading') return
-    const t = setTimeout(() => {
-      if (!dateCard) {
-        setDateCard({
-          time: 'Tomorrow 12:15 – 1:00 PM',
-          venue: 'Student Center Coffee Bar',
-          walk_minutes: 6,
-          shared_context: 'You\'re both on the same campus — easiest first step.',
-          reasoning: 'Lunch break is the overlap both schedules share. Coffee bar is low-key, no pressure.',
-          icebreaker: 'What\'s the most unexpectedly good thing you\'ve found on campus?',
-        })
-      }
-    }, 15000)
-    return () => clearTimeout(t)
-  }, [screen, dateCard])
-
-  function handleArrange() {
-    if (dateCard) {
-      setScreen('datecard')
-    } else {
-      setDateCard({
+    setSimulatedStep(1)
+    const delays = [1400, 2000, 2200, 1800, 1600]
+    const timers: ReturnType<typeof setTimeout>[] = []
+    let elapsed = 0
+    delays.forEach((d, i) => {
+      elapsed += d
+      timers.push(setTimeout(() => setSimulatedStep(i + 2), elapsed))
+    })
+    // After all steps finish, inject the date card (if AI backend didn't respond)
+    timers.push(setTimeout(() => {
+      setDateCard(dc => dc ?? {
         time: 'Tomorrow 12:15 – 1:00 PM',
         venue: 'Student Center Coffee Bar',
         walk_minutes: 6,
@@ -114,13 +115,28 @@ export default function MatchPage() {
         reasoning: 'Lunch break is the overlap both schedules share. Coffee bar is low-key, no pressure.',
         icebreaker: 'What\'s the most unexpectedly good thing you\'ve found on campus?',
       })
-      setScreen('datecard')
+    }, elapsed + 600))
+    return () => timers.forEach(clearTimeout)
+  }, [screen])
+
+  function handleArrange() {
+    setScreen('loading')
+  }
+
+  function markMatchHandled(matchId: string) {
+    const handled: string[] = JSON.parse(localStorage.getItem('anlan_matches_handled') ?? '[]')
+    if (!handled.includes(matchId)) {
+      localStorage.setItem('anlan_matches_handled', JSON.stringify([...handled, matchId]))
     }
+    localStorage.removeItem('anlan_match_id')
   }
 
   async function handleConfirm() {
     const matchId = localStorage.getItem('anlan_match_id')
-    if (matchId) await supabase.from('matches').update({ status: 'confirmed' }).eq('id', matchId)
+    if (matchId) {
+      await supabase.from('matches').update({ status: 'confirmed' }).eq('id', matchId)
+      markMatchHandled(matchId)
+    }
     setScreen('confirmed')
   }
 
@@ -130,6 +146,7 @@ export default function MatchPage() {
     const { data } = await supabase.from('matches').select('cancel_count').eq('id', matchId).single()
     const newCount = (data?.cancel_count ?? 0) + 1
     await supabase.from('matches').update({ cancel_count: newCount, status: 'cancelled' }).eq('id', matchId)
+    markMatchHandled(matchId)
     if (newCount >= 3) {
       alert('You\'ve cancelled 3 dates. Your account is paused for 1 week.')
     }
@@ -194,14 +211,11 @@ export default function MatchPage() {
 
   // ── Loading: Agent steps ──────────────────────────────────────────────────
   if (screen === 'loading') {
-    const displaySteps = agentSteps.length > 0 ? agentSteps : [
-      { label: 'Match detected',       status: 'done'    as const, ts: '' },
-      { label: 'Fetching profiles',    status: 'running' as const, ts: '' },
-      { label: 'Reading calendars & parsing schedules', status: 'pending' as const, ts: '' },
-      { label: 'Finding best venue',   status: 'pending' as const, ts: '' },
-      { label: 'Generating date plan', status: 'pending' as const, ts: '' },
-      { label: 'Sending iMessage',     status: 'pending' as const, ts: '' },
-    ]
+    const displaySteps: AgentStep[] = agentSteps.length > 0 ? agentSteps : DEMO_STEPS.map((label, i) => ({
+      label,
+      status: i < simulatedStep ? 'done' : i === simulatedStep ? 'running' : 'pending',
+      ts: i < simulatedStep ? new Date().toISOString() : '',
+    }))
 
     return (
       <main className="min-h-screen flex flex-col items-center justify-center px-6 bg-[#f8f7f4]">
