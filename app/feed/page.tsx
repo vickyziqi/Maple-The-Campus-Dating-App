@@ -202,6 +202,21 @@ export default function FeedPage() {
         setCurrentUser(me)
         setAllUsers(all ?? [])
 
+        // Check for existing match on load (in case realtime event was missed)
+        const { data: existingMatch } = await supabase
+          .from('matches')
+          .select('id, status')
+          .or(`user_a.eq.${userId},user_b.eq.${userId}`)
+          .eq('status', 'released')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+        if (existingMatch) {
+          localStorage.setItem('anlan_match_id', existingMatch.id)
+          router.push('/match')
+          return
+        }
+
         // 10/day cap — only applies if there are enough users to be meaningful
         if ((swipedToday ?? 0) >= 10 && (all?.length ?? 0) > 10) {
           setDailyCap(true)
