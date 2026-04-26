@@ -6,6 +6,20 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
+// ─── Allowed Claremont Colleges domains ──────────────────────────────────────
+const ALLOWED_DOMAINS = [
+  'pitzer.edu',
+  'students.pitzer.edu',
+  'mymail.pomona.edu',
+  'scrippscollege.edu',
+  'claremontmckenna.edu',
+  'cmc.edu',
+]
+
+function isAllowedEmail(email: string) {
+  const domain = email.split('@')[1]?.toLowerCase()
+  return ALLOWED_DOMAINS.includes(domain)
+}
 
 type Mode = 'signup' | 'login'
 
@@ -21,7 +35,11 @@ export default function HomePage() {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // SMS OTP state
   const [pendingUserId, setPendingUserId] = useState('')
+  const [pendingPhone, setPendingPhone] = useState('')
+  const [pendingName, setPendingName] = useState('')
   const [otp, setOtp] = useState('')
   const [otpLoading, setOtpLoading] = useState(false)
   const [otpError, setOtpError] = useState('')
@@ -46,16 +64,12 @@ export default function HomePage() {
       const { data, error: dbError } = await supabase
         .from('users').select('id, name, email_verified').eq('email', form.email).single()
       if (dbError || !data) { setError("We couldn't find that email. Sign up first."); return }
-      if (!data.email_verified) { setError('Please verify your email first — check your inbox for the code.'); return }
+      if (!data.email_verified) { setError('Please finish verifying your phone number first.'); return }
       localStorage.setItem('anlan_user_id', data.id)
       localStorage.setItem('anlan_user_name', data.name)
       router.push('/feed')
     } catch { setError('Network error. Check your connection.') }
     finally { setLoading(false) }
-  }
-
-  function isStudentEmail(email: string) {
-    return /\.(edu|ac\.uk|ac\.cn|edu\.cn|edu\.au|edu\.sg|ac\.jp|uni\..*|university\..*)$/i.test(email)
   }
 
   async function handleSignup(e: React.FormEvent) {
@@ -65,8 +79,8 @@ export default function HomePage() {
       setError('Please fill in all required fields')
       return
     }
-    if (!isStudentEmail(form.email)) {
-      setError('Please use your university email (e.g. .edu, .ac.uk)')
+    if (!isAllowedEmail(form.email)) {
+      setError('Only 5C emails allowed: pitzer.edu, mymail.pomona.edu, scrippscollege.edu, claremontmckenna.edu / cmc.edu')
       return
     }
     const digits = form.phone.replace(/\D/g, '')
@@ -75,12 +89,13 @@ export default function HomePage() {
       return
     }
     setLoading(true)
+    const fullPhone = '+1' + digits
     try {
       const { data, error: dbError } = await supabase
         .from('users')
         .insert({
           name: form.name, email: form.email, gender: form.gender,
-          want_to_date: form.want_to_date, phone: '+1' + form.phone.replace(/\D/g, ''),
+          want_to_date: form.want_to_date, phone: fullPhone,
           schedule_text: form.schedule_text || null, campus: form.campus,
           email_verified: false,
         })
@@ -90,12 +105,20 @@ export default function HomePage() {
         else setError('Sign up failed. Try again.')
         return
       }
-      await fetch('/api/verify-email', {
+
+      // Send SMS OTP
+      const res = await fetch('/api/verify-phone', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: data.id, email: form.email, name: form.name }),
+        body: JSON.stringify({ userId: data.id, phone: fullPhone }),
       })
+      if (!res.ok) {
+        setError('Failed to send SMS. Check your phone number.')
+        return
+      }
       setPendingUserId(data.id)
+      setPendingPhone(fullPhone)
+      setPendingName(form.name)
     } catch { setError('Network error. Check your connection.') }
     finally { setLoading(false) }
   }
@@ -103,31 +126,32 @@ export default function HomePage() {
   async function handleOtpSubmit(e: React.FormEvent) {
     e.preventDefault()
     setOtpError('')
-    if (otp.length !== 6) { setOtpError('Enter the 6-digit code from your email'); return }
+    if (otp.length !== 6) { setOtpError('Enter the 6-digit code we texted you'); return }
     setOtpLoading(true)
     try {
-      const res = await fetch('/api/verify-email', {
+      const res = await fetch('/api/verify-phone', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: pendingUserId, code: otp }),
+        body: JSON.stringify({ userId: pendingUserId, phone: pendingPhone, code: otp }),
       })
       const json = await res.json()
-      if (!res.ok) { setOtpError('Wrong code — double-check your email'); return }
+      if (!res.ok) { setOtpError('Wrong code — try again'); return }
       localStorage.setItem('anlan_user_id', pendingUserId)
-      localStorage.setItem('anlan_user_name', json.name)
+      localStorage.setItem('anlan_user_name', json.name ?? pendingName)
       router.push('/feed')
     } catch { setOtpError('Network error. Try again.') }
     finally { setOtpLoading(false) }
   }
 
-  async function resendCode() {
+  async function resendSms() {
     setOtpError('')
-    await fetch('/api/verify-email', {
+    const res = await fetch('/api/verify-phone', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: pendingUserId, email: form.email, name: form.name }),
+      body: JSON.stringify({ userId: pendingUserId, phone: pendingPhone }),
     })
-    setOtpError('New code sent ✓')
+    if (res.ok) setOtpError('New code sent ✓')
+    else setOtpError('Failed to resend. Try again.')
   }
 
   return (
@@ -143,15 +167,15 @@ export default function HomePage() {
           <p className="text-sm text-[#9b9590] mt-1">your crush is probably already here 👀</p>
         </div>
 
-        {/* OTP verification screen */}
+        {/* SMS OTP screen */}
         {pendingUserId && (
           <div className="animate-fade-in">
             <div className="text-center mb-6">
-              <div className="text-4xl mb-3">📬</div>
-              <h2 className="text-lg font-semibold text-[#111] mb-1">check your inbox</h2>
+              <div className="text-4xl mb-3">📱</div>
+              <h2 className="text-lg font-semibold text-[#111] mb-1">check your texts</h2>
               <p className="text-sm text-[#9b9590] leading-relaxed">
-                we sent a 6-digit code to<br />
-                <span className="font-medium text-[#6b6760]">{form.email}</span>
+                we texted a 6-digit code to<br />
+                <span className="font-medium text-[#6b6760]">{pendingPhone}</span>
               </p>
             </div>
             <form onSubmit={handleOtpSubmit} className="space-y-3">
@@ -180,8 +204,7 @@ export default function HomePage() {
             </form>
             <p className="text-center text-xs text-[#c5c0bb] mt-4">
               didn&apos;t get it?{' '}
-              <button onClick={resendCode} className="underline hover:text-[#9b9590]">resend code</button>
-              {' '}· check spam too
+              <button onClick={resendSms} className="underline hover:text-[#9b9590]">resend</button>
             </p>
           </div>
         )}
@@ -228,9 +251,9 @@ export default function HomePage() {
                     className={inputCls}
                   />
                 </Field>
-                <Field label="uni email" required>
+                <Field label="5C email" required hint="pitzer · pomona · scripps · cmc">
                   <input
-                    type="email" placeholder="you@university.edu" value={form.email}
+                    type="email" placeholder="you@mymail.pomona.edu" value={form.email}
                     onChange={(e) => set('email', e.target.value)}
                     className={inputCls}
                   />
@@ -276,7 +299,7 @@ export default function HomePage() {
                     ))}
                   </div>
                 </Field>
-                <Field label="phone" required hint="we'll text you when it's mutual 🍁">
+                <Field label="phone" required hint="verification code goes here 📱">
                   <div className="flex items-center bg-white border border-[#e8e6e1] rounded-xl overflow-hidden focus-within:border-[#111] transition-colors">
                     <div className="flex items-center gap-1.5 px-3 py-3 border-r border-[#e8e6e1] shrink-0 select-none">
                       <span className="text-base leading-none">🇺🇸</span>
@@ -298,17 +321,13 @@ export default function HomePage() {
                     />
                   </div>
                 </Field>
-                <div className="flex items-center gap-2 bg-[#f0ede8] rounded-xl px-4 py-3">
-                  <span className="text-sm">✉️</span>
-                  <span className="text-xs text-[#6b6760]">connect your email later to find people you already vibe with</span>
-                </div>
                 {error && <ErrorMsg>{error}</ErrorMsg>}
                 <Btn loading={loading} label="shoot your shot →" />
               </form>
             )}
 
             <p className="text-center text-xs text-[#c5c0bb] mt-6 leading-relaxed">
-              no pics. no followers. just vibes.<br />only matches if it&apos;s mutual 🤝
+              5Cs only · no pics · mutual matches only 🤝
             </p>
           </>
         )}
