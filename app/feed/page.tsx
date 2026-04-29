@@ -261,6 +261,12 @@ export default function FeedPage() {
   useEffect(() => {
     if (match) {
       localStorage.setItem('anlan_match_id', match.id)
+      // Notify both users via SMS (best-effort)
+      fetch('/api/notify-match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ matchId: match.id }),
+      }).catch(() => {})
       router.push('/match')
     }
   }, [match, router])
