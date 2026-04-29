@@ -14,6 +14,7 @@ const ALLOWED_DOMAINS = [
   'scrippscollege.edu',
   'claremontmckenna.edu',
   'cmc.edu',
+  'g.hmc.edu',
 ]
 
 function isAllowedEmail(email: string) {
@@ -251,7 +252,7 @@ export default function HomePage() {
                     className={inputCls}
                   />
                 </Field>
-                <Field label="5C email" required hint="pitzer · pomona · scripps · cmc">
+                <Field label="5C email" required hint="pitzer · pomona · scripps · cmc · hmc">
                   <input
                     type="email" placeholder="you@mymail.pomona.edu" value={form.email}
                     onChange={(e) => set('email', e.target.value)}
