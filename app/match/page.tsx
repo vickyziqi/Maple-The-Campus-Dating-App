@@ -393,18 +393,28 @@ export default function MatchPage() {
           <p className="text-xs text-[#c5c0bb] mb-8">both of you confirmed. don&apos;t be late 😤</p>
 
           {/* Navigation prompt */}
-          {mapsUrl && (
+          {mapsUrl && dateCard && (
             <div className="bg-white border border-[#e8e6e1] rounded-2xl p-4 mb-4 text-left">
               <p className="text-sm font-medium text-[#111] mb-1">want directions? 🗺️</p>
-              <p className="text-xs text-[#9b9590] mb-3">open Google Maps and navigate straight there</p>
-              <a
-                href={mapsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full bg-[#111] text-white rounded-xl py-3 text-sm font-medium active:scale-[0.98] transition-transform"
-              >
-                <span>📍</span> open in Google Maps
-              </a>
+              <p className="text-xs text-[#9b9590] mb-3">navigate straight to {dateCard.venue}</p>
+              <div className="flex gap-2">
+                <a
+                  href={mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-1.5 bg-[#111] text-white rounded-xl py-3 text-xs font-medium active:scale-[0.98] transition-transform"
+                >
+                  <span>🗺️</span> Google Maps
+                </a>
+                <a
+                  href={`maps://maps.apple.com/?q=${encodeURIComponent(dateCard.venue + ' Claremont CA')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-1.5 bg-white border border-[#e8e6e1] text-[#111] rounded-xl py-3 text-xs font-medium active:scale-[0.98] transition-transform"
+                >
+                  <span>🍎</span> Apple Maps
+                </a>
+              </div>
             </div>
           )}
 
