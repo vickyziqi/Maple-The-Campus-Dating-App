@@ -325,8 +325,20 @@ export default function FeedPage() {
       const onMaple: ClassmateOnMaple[] = []
       const offMaple: ContactNotOnMaple[] = []
 
+      const FIVE_C_DOMAINS = [
+        'pitzer.edu', 'students.pitzer.edu',
+        'mymail.pomona.edu',
+        'scrippscollege.edu',
+        'claremontmckenna.edu', 'cmc.edu',
+        'g.hmc.edu',
+      ]
+      function isFiveC(email: string) {
+        return FIVE_C_DOMAINS.some(d => email.endsWith('@' + d))
+      }
+
       for (const contact of connections) {
         if (contact.email === myEmail) continue
+        if (!isFiveC(contact.email)) continue // skip non-5C contacts
         const mapleUser = emailToUser.get(contact.email)
         if (mapleUser && !swipedIds.has(mapleUser.id)) {
           onMaple.push({
