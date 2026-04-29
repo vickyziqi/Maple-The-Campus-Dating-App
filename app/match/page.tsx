@@ -304,15 +304,32 @@ export default function MatchPage() {
                 </div>
               </div>
             </div>
-            <div className="px-5 py-4 border-b border-[#f0ede8]">
-              <div className="flex items-center gap-3">
+            <div className="border-b border-[#f0ede8]">
+              <div className="flex items-center gap-3 px-5 py-4">
                 <span className="text-xl">📍</span>
-                <div>
+                <div className="flex-1 min-w-0">
                   <p className="text-xs text-[#9b9590] mb-0.5">Where</p>
                   <p className="text-sm font-semibold text-[#111]">{dateCard.venue}</p>
-                  <p className="text-xs text-[#9b9590]">{dateCard.walk_minutes} min walk</p>
+                  <p className="text-xs text-[#9b9590]">~{dateCard.walk_minutes} min walk each</p>
+                  {'maps_url' in dateCard && dateCard.maps_url && (
+                    <a
+                      href={dateCard.maps_url as string}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-500 underline mt-0.5 inline-block"
+                    >
+                      open in maps →
+                    </a>
+                  )}
                 </div>
               </div>
+              {'static_map' in dateCard && dateCard.static_map && (
+                <img
+                  src={dateCard.static_map as string}
+                  alt="venue map"
+                  className="w-full h-32 object-cover"
+                />
+              )}
             </div>
             <div className="px-5 py-4 border-b border-[#f0ede8]">
               <div className="flex items-center gap-3">

@@ -261,6 +261,12 @@ export default function FeedPage() {
   useEffect(() => {
     if (match) {
       localStorage.setItem('anlan_match_id', match.id)
+      // Plan the date using GPS midpoint + Google Places (best-effort)
+      fetch('/api/plan-date', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ matchId: match.id }),
+      }).catch(() => {})
       // Notify both users via SMS (best-effort)
       fetch('/api/notify-match', {
         method: 'POST',
